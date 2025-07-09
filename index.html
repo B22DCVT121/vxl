@@ -1,16 +1,260 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AE XÃ ĐOÀN</title>
-  <link rel="stylesheet" href="lsd1.css">
+  <title>Flashcard App</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #83a4d4, #b6fbff);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 20px;
+    }
+    h1, h2 { color: #333; margin: 20px 0; }
+    .card {
+      width: 350px;
+      height: 200px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: bold;
+      color: #333;
+      cursor: pointer;
+      transition: transform 0.4s;
+      margin-bottom: 20px;
+    }
+    .card:hover { transform: scale(1.03); }
+    .controls button, .admin-controls button, .toggle-list-btn {
+      padding: 12px 24px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      background-color: #007BFF;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transition: background 0.3s;
+    }
+    .controls button:hover, .admin-controls button:hover, .toggle-list-btn:hover {
+      background-color: #0056b3;
+    }
+    .admin-controls {
+      margin-top: 30px;
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .admin-controls input {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    #cardList {
+      margin-top: 20px;
+      list-style: none;
+      padding-left: 0;
+      width: 100%;
+      max-width: 500px;
+    }
+    #cardList li {
+      background: #fff;
+      padding: 10px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #cardList li button {
+      margin-left: 10px;
+      font-size: 14px;
+      padding: 4px 8px;
+    }
+  </style>
 </head>
 <body>
-  <h1>ÔN TẬP TRẮC NGHIỆM</h1>
-  <div id="quiz-container"></div>
-  <button id="submit-btn">Nộp bài</button>
-  <div id="result"></div>
-  <script src="lsd1.js"></script>
+  <h1>🎓 Flashcard Học Từ Vựng</h1>
+  <div class="card" onclick="flipCard()">
+    <div id="cardText">Từ vựng</div>
+  </div>
+  <div class="controls">
+    <button onclick="prevCard()">⬅️ Trước</button>
+    <button onclick="nextCard()">➡️ Tiếp</button>
+    <button onclick="speakText(cards[current].front)">🔊 Phát âm</button>
+
+  </div>
+  <div class="admin-controls">
+    <input type="text" id="newFront" placeholder="Từ mới (tiếng Anh)">
+    <input type="text" id="newBack" placeholder="Nghĩa tiếng Việt">
+    <button onclick="addCard()">➕ Thêm thẻ</button>
+  </div>
+  <button class="toggle-list-btn" onclick="toggleCardList()">📋 Xem danh sách từ</button>
+  <div id="cardListSection" style="display: none;">
+    <h2>📚 Danh sách từ vựng</h2>
+    <ul id="cardList"></ul>
+  </div>
+  <script>
+    const STORAGE_KEY = 'flashcard_data';
+    let cards = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [
+      { front: 'abandon', back: 'từ bỏ, ruồng bỏ' },
+      { front: 'benefit', back: 'lợi ích' },
+      { front: 'challenge', back: 'thử thách' },
+      { front: 'efficient', back: 'hiệu quả' },
+      { front: 'flexible', back: 'linh hoạt' }
+    ];
+    let current = 0;
+    let learningOrder = [];
+    let currentIndex = 0;
+    let isFlipped = false;
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+    }
+
+    function resetLearningOrder() {
+      learningOrder = Array.from(Array(cards.length).keys());
+      shuffleArray(learningOrder);
+      currentIndex = 0;
+      current = learningOrder[currentIndex];
+    }
+
+    function showCard() {
+      if (cards.length === 0) {
+        document.getElementById('cardText').innerText = 'Không có thẻ';
+        return;
+      }
+      const card = cards[current];
+      document.getElementById('cardText').innerText = isFlipped ? card.back : card.front;
+    }
+
+    function flipCard() {
+      if (cards.length === 0) return;
+      isFlipped = !isFlipped;
+      showCard();
+    }
+
+    function nextCard() {
+      if (cards.length === 0) return;
+      if (learningOrder.length !== cards.length) resetLearningOrder();
+      currentIndex++;
+      if (currentIndex >= learningOrder.length) {
+        alert("Đã hoàn thành lượt học. Bắt đầu lại!");
+        resetLearningOrder();
+      } else {
+        current = learningOrder[currentIndex];
+      }
+      isFlipped = false;
+      showCard();
+    }
+
+    function prevCard() {
+      if (cards.length === 0) return;
+      if (learningOrder.length === 0 || currentIndex <= 0) return;
+      currentIndex--;
+      current = learningOrder[currentIndex];
+      isFlipped = false;
+      showCard();
+    }
+
+    function addCard() {
+      const front = document.getElementById('newFront').value.trim();
+      const back = document.getElementById('newBack').value.trim();
+      if (front && back) {
+        cards.push({ front, back });
+        saveToStorage();
+        resetLearningOrder();
+        current = cards.length - 1;
+        isFlipped = false;
+        showCard();
+        renderCardList();
+        document.getElementById('newFront').value = '';
+        document.getElementById('newBack').value = '';
+      } else {
+        alert('Vui lòng nhập đầy đủ cả từ và nghĩa!');
+      }
+    }
+
+    function renderCardList() {
+      const list = document.getElementById('cardList');
+      if (!list) return;
+      list.innerHTML = '';
+      cards.forEach((card, index) => {
+        const item = document.createElement('li');
+        item.innerHTML = `
+          <span><strong>${card.front}</strong>: ${card.back}</span>
+          <span>
+            <button onclick="editCardFromList(${index})">✏️</button>
+            <button onclick="deleteCardFromList(${index})">🗑️</button>
+          </span>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function editCardFromList(index) {
+      const front = prompt('Nhập từ mới:', cards[index].front);
+      const back = prompt('Nhập nghĩa mới:', cards[index].back);
+      if (front && back) {
+        cards[index] = { front, back };
+        saveToStorage();
+        renderCardList();
+        showCard();
+      }
+    }
+
+    function deleteCardFromList(index) {
+      if (confirm('Bạn có chắc chắn muốn xoá thẻ này?')) {
+        cards.splice(index, 1);
+        if (current >= cards.length) current = cards.length - 1;
+        saveToStorage();
+        resetLearningOrder();
+        renderCardList();
+        showCard();
+      }
+    }
+
+    function toggleCardList() {
+      const listSection = document.getElementById('cardListSection');
+      if (listSection.style.display === 'none') {
+        listSection.style.display = 'block';
+        renderCardList();
+      } else {
+        listSection.style.display = 'none';
+      }
+    }
+    function speakText(text) {
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    speechSynthesis.speak(utterance);
+  } else {
+    alert('Trình duyệt của bạn không hỗ trợ phát âm.');
+  }
+}
+
+    resetLearningOrder();
+    showCard();
+  </script>
 </body>
 </html>
